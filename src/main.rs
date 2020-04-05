@@ -151,19 +151,10 @@ impl Handler<PrintState> for StopState {
 const MOGILSKIE_POKOJU: &str = "12529";
 const GRZEGORZECKIE: &str = "36519";
 const CZYZYNSKIE: &str = "40849";
-const DOKTOR_LUBICZ: &str = "12629";
 const STOP_IDS: [&str; 3] = [MOGILSKIE_POKOJU, GRZEGORZECKIE, CZYZYNSKIE];
-// const STOP_IDS: [&str; 3] = ["12919", "13019", "304019"];
-
-// struct TripTracker {
-// trips: HashMap<String, Addr<Trip>>,
-// }
 
 fn main() {
     System::run(|| {
-        // trip_registry::TripRegistry::start_default()
-        // .do_send(trip_registry::RegisterTrip { id: String::from("8059232507168034829") });
-
         STOP_IDS.iter().for_each(|x| {
             StopState::create(|_ctx| StopState {
                 stop_id: x,
@@ -173,34 +164,6 @@ fn main() {
             })
             .do_send(UpdateRequest {});
         });
-
-        // passage::Trip::create(|_ctx| {
-        //     passage::Trip {
-        //         id: String::from("8059232507169583113"),
-        //         next_stop: None,
-        //         stop_seq: None,
-        //         trip_meta: None,
-        //         update_time: None,
-        //     }
-        // });
-
-        // let addr = StopState::create(|_ctx| {
-        //     StopState {
-        //         stop_id: "281129",
-        //         last_check: std::time::Instant::now(),
-        //         last_reparture_diff: 1
-        //     }
-        // });
-        // addr.do_send(PrintState {});
-        // addr.do_send(UpdateRequest {});
-        // addr.do_send(PrintState {});
     })
     .unwrap();
 }
-
-/*
-1. zrobić registry dla kolejnych fragmentów linii tramwajowych
-2. zapisywać w stanie tego aktora czasy zakończonych przejazdów (dla przeszłych) i momenty wjechania – aktualnych
-3. do aktora wysyłać tylko komunikaty wjechania i wyjechania
-4. do renderowania stanu aktualnego używać tylko tych aktorów
-*/

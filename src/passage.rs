@@ -185,35 +185,6 @@ impl Handler<DirectPassageSync> for Trip {
             }
         }
 
-        // let new_stop_seq = _msg
-        //     .passage
-        //     .actual
-        //     .first()
-        //     .map(|x| x.stop_seq_num.parse::<u32>().unwrap());
-
-        // if new_stop_seq != self.stop_seq {
-        //     let new_stop = _msg
-        //         .passage
-        //         .actual
-        //         .first()
-        //         .map(|x| String::from(&x.stop.name));
-
-        //     println!(
-        //         "{} {:?} made progress: {:?} -> {:?}",
-        //         &self.id, &self.trip_meta, self.next_stop, new_stop
-        //     );
-
-        //     self.last_progress_time = self.update_time;
-        //     self.stop_seq = new_stop_seq;
-        //     self.next_stop = new_stop;
-
-        //     if self.next_stop.is_some() {
-        //         route_fragment_registry::RouteFragmentRegistry::from_registry()
-        //             .send(route_fragment_registry::GetRouteFragment::new()));
-
-        //     }
-        // }
-
         println!("{:?}", self);
     }
 }
