@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use actix::prelude::*;
+use chrono::Local;
+use chrono::NaiveTime;
 
 #[path = "route_fragment_registry.rs"]
 mod route_fragment_registry;
@@ -158,6 +160,7 @@ impl Handler<DirectPassageSync> for Trip {
                             route_fragment_registry::route_fragment::FragmentEntryEvent {
                                 trip_id: String::from(&actor.id),
                                 instant: std::time::Instant::now(),
+                                time: Local::now().time(),
                             },
                         )
                     });
@@ -166,17 +169,24 @@ impl Handler<DirectPassageSync> for Trip {
             }
 
             if let Some(old_stop) = _msg.passage.old.last() {
+                let ttime = old_stop
+                    .actual_time
+                    .as_ref()
+                    .map(|x| NaiveTime::parse_from_str(&x, "%H:%M").unwrap())
+                    .unwrap();
+
                 println!("Old passage: {}", old_stop.stop.id);
                 let z = route_fragment_registry::RouteFragmentRegistry::from_registry()
                     .send(route_fragment_registry::GetRouteFragment::new(
                         String::from(&old_stop.stop.id),
                     ))
                     .into_actor(self)
-                    .map(|result, actor, _ctx| {
+                    .map(move |result, actor, _ctx| {
                         result.unwrap().do_send(
                             route_fragment_registry::route_fragment::FragmentLeaveEvent {
                                 trip_id: String::from(&actor.id),
                                 instant: std::time::Instant::now(),
+                                time: ttime,
                             },
                         )
                     });

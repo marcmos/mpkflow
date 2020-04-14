@@ -42,7 +42,7 @@ impl Handler<GetRouteFragment> for RouteFragmentRegistry {
             None => {
                 let id = String::from(&_msg.id);
                 let new_fragment = route_fragment::RouteFragment::create(|_| {
-                    route_fragment::RouteFragment::new(String::from(_msg.id), String::from("x"))
+                    route_fragment::RouteFragment::new(String::from(_msg.id), String::from("?"))
                 });
 
                 self.route_fragments.insert(id, new_fragment.clone());
