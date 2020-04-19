@@ -106,7 +106,10 @@ impl Handler<UpdateMeta> for RouteFragment {
 
     fn handle(&mut self, msg: UpdateMeta, _ctx: &mut Context<Self>) {
         match msg {
-            UpdateMeta::UpdateStartName(start) => self.stop_names[0] = start,
+            UpdateMeta::UpdateStartName(start) => {
+                self.stop_names[0] = start;
+                println!("updated start name to {}", self.stop_names[0])
+            }
             UpdateMeta::UpdateStopName(stop) => self.stop_names[1] = stop,
         }
     }

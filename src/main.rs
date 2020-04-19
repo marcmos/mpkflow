@@ -1,6 +1,10 @@
 extern crate serde;
 extern crate serde_json;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -12,6 +16,10 @@ mod passage;
 mod route_fragment;
 mod route_fragment_registry;
 mod trip_registry;
+
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+
+use tokio::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Welcome {
@@ -239,22 +247,44 @@ const HUTA: [&str; 8] = [
     "40829", "40729", "11219", "11329", "281129", "304029", "13029", "12929",
 ];
 
-fn main() {
-    System::run(|| {
-        for x in 0..8 {
-            StopState::create(|_ctx| StopState {
-                stop_id: MOGILSKA[x],
-                name: None,
-                last_check: std::time::Instant::now(),
-                last_reparture_diff: None,
-                prev_stop: if x == 0 {
-                    None
-                } else {
-                    Some(String::from(MOGILSKA[x - 1]))
-                },
-            })
-            .do_send(UpdateRequest {});
-        }
+#[actix_rt::main]
+async fn main() -> std::io::Result<()> {
+    for x in 0..8 {
+        let actor_addr = StopState::create(|_ctx| StopState {
+            stop_id: MOGILSKA[x],
+            name: None,
+            last_check: std::time::Instant::now(),
+            last_reparture_diff: None,
+            prev_stop: if x == 0 {
+                None
+            } else {
+                Some(String::from(MOGILSKA[x - 1]))
+            },
+        });
+        actor_addr.do_send(UpdateRequest {});
+    }
+
+    HttpServer::new(move || {
+        App::new().service(web::resource("/test").to(move || async {
+            let x = route_fragment_registry::RouteFragmentRegistry::from_registry()
+                .send(route_fragment_registry::GetRouteFragment::new(
+                    String::from(MOGILSKA[0]),
+                ))
+                .await;
+
+            x.unwrap()
+                .send(
+                    route_fragment_registry::route_fragment::UpdateMeta::UpdateStartName(
+                        "heheheheh".to_string(),
+                    ),
+                )
+                .await
+                .unwrap();
+
+            HttpResponse::Ok()
+        }))
     })
-    .unwrap();
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
 }
