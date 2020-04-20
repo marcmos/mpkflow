@@ -1,6 +1,7 @@
 use actix::prelude::*;
 
 use chrono::NaiveTime;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 use std::time::Instant;
@@ -48,6 +49,27 @@ pub struct FragmentLeaveEvent {
 pub enum UpdateMeta {
     UpdateStartName(String),
     UpdateStopName(String),
+}
+
+#[derive(Serialize, MessageResponse, Debug)]
+pub struct RouteFragmentStats {
+    pub stop_id: String,
+    pub time: Option<u64>,
+}
+
+#[derive(Message, Debug)]
+#[rtype(result = "RouteFragmentStats")]
+pub struct FragmentStatusRequest;
+
+impl Handler<FragmentStatusRequest> for RouteFragment {
+    type Result = RouteFragmentStats;
+
+    fn handle(&mut self, _msg: FragmentStatusRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        return RouteFragmentStats {
+            stop_id: self.stop_names[0].clone(),
+            time: self.past_trip_duration.last().map(|x| x.as_secs()),
+        };
+    }
 }
 
 impl RouteFragment {

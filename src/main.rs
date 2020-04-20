@@ -11,13 +11,14 @@ use std::time::Duration;
 use actix::prelude::*;
 
 use chrono::Local;
+use futures::prelude::*;
 
 mod passage;
 mod route_fragment;
 mod route_fragment_registry;
 mod trip_registry;
 
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
 
 use tokio::prelude::*;
 
@@ -247,6 +248,21 @@ const HUTA: [&str; 8] = [
     "40829", "40729", "11219", "11329", "281129", "304029", "13029", "12929",
 ];
 
+async fn handle_frag_stat(
+    req: HttpRequest,
+    path: web::Path<(String,)>,
+) -> Result<HttpResponse, Error> {
+    let resp = route_fragment_registry::RouteFragmentRegistry::from_registry()
+        .send(route_fragment_registry::GetRouteFragment::new(
+            path.0.clone(),
+        ))
+        .and_then(|x| x.send(route_fragment_registry::route_fragment::FragmentStatusRequest))
+        .await
+        .unwrap();
+
+    Ok(HttpResponse::Ok().json(resp))
+}
+
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
     for x in 0..8 {
@@ -264,27 +280,8 @@ async fn main() -> std::io::Result<()> {
         actor_addr.do_send(UpdateRequest {});
     }
 
-    HttpServer::new(move || {
-        App::new().service(web::resource("/test").to(move || async {
-            let x = route_fragment_registry::RouteFragmentRegistry::from_registry()
-                .send(route_fragment_registry::GetRouteFragment::new(
-                    String::from(MOGILSKA[0]),
-                ))
-                .await;
-
-            x.unwrap()
-                .send(
-                    route_fragment_registry::route_fragment::UpdateMeta::UpdateStartName(
-                        "heheheheh".to_string(),
-                    ),
-                )
-                .await
-                .unwrap();
-
-            HttpResponse::Ok()
-        }))
-    })
-    .bind("127.0.0.1:8080")?
-    .run()
-    .await
+    HttpServer::new(move || App::new().service(web::resource("/test/{id}").to(handle_frag_stat)))
+        .bind("127.0.0.1:8080")?
+        .run()
+        .await
 }
