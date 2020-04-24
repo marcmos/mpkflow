@@ -18,7 +18,9 @@ mod route_fragment;
 mod route_fragment_registry;
 mod trip_registry;
 
-use actix_web::{get, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{
+    get, web, web::Data, App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
+};
 
 use tokio::prelude::*;
 
@@ -251,8 +253,9 @@ const HUTA: [&str; 8] = [
 async fn handle_frag_stat(
     req: HttpRequest,
     path: web::Path<(String,)>,
+    state: Data<Addr<route_fragment_registry::RouteFragmentRegistry>>,
 ) -> Result<HttpResponse, Error> {
-    let resp = route_fragment_registry::RouteFragmentRegistry::from_registry()
+    let resp = state
         .send(route_fragment_registry::GetRouteFragment::new(
             path.0.clone(),
         ))
@@ -280,8 +283,14 @@ async fn main() -> std::io::Result<()> {
         actor_addr.do_send(UpdateRequest {});
     }
 
-    HttpServer::new(move || App::new().service(web::resource("/test/{id}").to(handle_frag_stat)))
-        .bind("127.0.0.1:8080")?
-        .run()
-        .await
+    let rfr = route_fragment_registry::RouteFragmentRegistry::from_registry();
+
+    HttpServer::new(move || {
+        App::new()
+            .data(rfr.clone())
+            .service(web::resource("/test/{id}").to(handle_frag_stat))
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
 }
