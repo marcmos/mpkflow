@@ -136,7 +136,7 @@ impl Handler<UpdateRequest> for StopState {
 
             let z = match wait {
                 Some(x) if x > 30 => x,
-                _ => 30,
+                _ => 120,
             };
 
             let update_reason = if let Some(act) = actual {
