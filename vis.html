@@ -121,25 +121,32 @@
             .then((data) => {
                for (const stop of data) {
                   var color, opacity;
-                  if (stop.time <= 60) {
+                  if (!stop.time) {
+                     color = "#cccccc";
+                  } else if (stop.time && stop.time <= 60) {
                      color = "green";
                   } else if (stop.time <= 120) {
                      color = "yellow";
                   } else if (stop.time >= 180) {
                      color = "red";
-                  } else {
-                     color = "#cccccc";
                   }
                   document.getElementById(stop.stop_id).style.fill = color;
+
                   x = stop.update_secs / 300;
-                  if (x > 1) x = 1;
+                  if (x > 1 || stop.update_secs === undefined) x = 1;
                   document.getElementById(stop.stop_id).style.opacity = 1 - x;
+
+                  if (stop.active_trips > 0) {
+                     document.getElementById(stop.stop_id).style.stroke = "red";
+                  } else {
+                     document.getElementById(stop.stop_id).style.stroke = null;
+                  }
+
 
                   if (x == 1) {
                      document.getElementById(stop.stop_id).style.fill = "#cccccc";
                      document.getElementById(stop.stop_id).style.opacity = 1;
                   }
-                  console.log(stop);
                }
             });
          setTimeout(update, 5000);
