@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use actix::prelude::*;
+use actix_files::NamedFile;
 
 use chrono::Local;
 use futures::prelude::*;
@@ -79,6 +80,7 @@ pub struct Route {
 }
 
 async fn fetch_stop_passage(s: &str) -> reqwest::Result<Welcome> {
+    println!("fetch");
     let fs = format!("https://mpk.jacekk.net/proxy_tram.php/services/passageInfo/stopPassages/stopPoint?stopPoint={}&mode=departure", s);
     let url = reqwest::Url::parse(&fs).unwrap();
 
@@ -247,23 +249,40 @@ const MOGILSKA: [&str; 8] = [
     "12529", "12919", "13019", "304019", "281119", "11319", "11219", "40719",
 ];
 const HUTA: [&str; 8] = [
-    "40829", "40729", "11219", "11329", "281129", "304029", "13029", "12929",
+    "40829", "40729", "11229", "11329", "281129", "304029", "13029", "12929",
 ];
 
 async fn handle_frag_stat(
     req: HttpRequest,
-    path: web::Path<(String,)>,
     state: Data<Addr<route_fragment_registry::RouteFragmentRegistry>>,
 ) -> Result<HttpResponse, Error> {
-    let resp = state
-        .send(route_fragment_registry::GetRouteFragment::new(
-            path.0.clone(),
-        ))
-        .and_then(|x| x.send(route_fragment_registry::route_fragment::FragmentStatusRequest))
-        .await
-        .unwrap();
+    let mut vec = Vec::new();
+    for stop in MOGILSKA.iter() {
+        let resp = state
+            .send(route_fragment_registry::GetRouteFragment::new(
+                stop.to_string(),
+            ))
+            .and_then(|x| x.send(route_fragment_registry::route_fragment::FragmentStatusRequest))
+            .await
+            .unwrap();
+        vec.push(resp);
+    }
+    for stop in HUTA.iter() {
+        let resp = state
+            .send(route_fragment_registry::GetRouteFragment::new(
+                stop.to_string(),
+            ))
+            .and_then(|x| x.send(route_fragment_registry::route_fragment::FragmentStatusRequest))
+            .await
+            .unwrap();
+        vec.push(resp);
+    }
 
-    Ok(HttpResponse::Ok().json(resp))
+    Ok(HttpResponse::Ok().json(vec))
+}
+
+async fn file(req: HttpRequest) -> actix_web::Result<NamedFile> {
+    Ok(NamedFile::open("vis.html")?)
 }
 
 #[actix_rt::main]
@@ -283,12 +302,28 @@ async fn main() -> std::io::Result<()> {
         actor_addr.do_send(UpdateRequest {});
     }
 
+    for x in 0..8 {
+        let actor_addr = StopState::create(|_ctx| StopState {
+            stop_id: HUTA[x],
+            name: None,
+            last_check: std::time::Instant::now(),
+            last_reparture_diff: None,
+            prev_stop: if x == 0 {
+                None
+            } else {
+                Some(String::from(HUTA[x - 1]))
+            },
+        });
+        actor_addr.do_send(UpdateRequest {});
+    }
+
     let rfr = route_fragment_registry::RouteFragmentRegistry::from_registry();
 
     HttpServer::new(move || {
         App::new()
             .data(rfr.clone())
-            .service(web::resource("/test/{id}").to(handle_frag_stat))
+            .route("/", web::get().to(file))
+            .service(web::resource("/stats.json").to(handle_frag_stat))
     })
     .bind("127.0.0.1:8080")?
     .run()

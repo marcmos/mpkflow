@@ -1,14 +1,17 @@
 use actix::prelude::*;
 
 use chrono::NaiveTime;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 use std::time::Instant;
 
 pub struct RouteFragment {
+    id: String,
     stop_names: [String; 2],
     past_trip_duration: Vec<Duration>,
+    last_update_time: Option<Instant>,
     current_trip_starts: HashMap<String, NaiveTime>,
     current_trip_stops: HashMap<String, NaiveTime>,
 }
@@ -18,9 +21,11 @@ impl Actor for RouteFragment {
 }
 
 impl RouteFragment {
-    pub fn new(start_name: String, stop_name: String) -> RouteFragment {
+    pub fn new(id: String) -> RouteFragment {
         RouteFragment {
-            stop_names: [start_name, stop_name],
+            id: id,
+            stop_names: ["?".to_string(), "?".to_string()],
+            last_update_time: None,
             past_trip_duration: Vec::new(),
             current_trip_starts: HashMap::new(),
             current_trip_stops: HashMap::new(),
@@ -55,6 +60,7 @@ pub enum UpdateMeta {
 pub struct RouteFragmentStats {
     pub stop_id: String,
     pub time: Option<u64>,
+    pub update_secs: Option<u64>,
 }
 
 #[derive(Message, Debug)]
@@ -65,17 +71,32 @@ impl Handler<FragmentStatusRequest> for RouteFragment {
     type Result = RouteFragmentStats;
 
     fn handle(&mut self, _msg: FragmentStatusRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        let last_update = self
+            .last_update_time
+            .map(|x| (Instant::now() - x).as_secs());
         return RouteFragmentStats {
-            stop_id: self.stop_names[0].clone(),
+            stop_id: self.id.clone(),
             time: self.past_trip_duration.last().map(|x| x.as_secs()),
+            update_secs: last_update,
         };
     }
 }
 
 impl RouteFragment {
     fn insert_finished_trip(&mut self, start_time: &NaiveTime, stop_time: &NaiveTime) {
+        match (*stop_time - *start_time).to_std() {
+            Ok(duration) => {
+                self.past_trip_duration.push(duration);
+                self.last_update_time = Some(Instant::now());
+            }
+            Err(_) => warn!(
+                "Zero or negative trip duration for route fragment {}",
+                self.stop_names[0]
+            ),
+        }
         self.past_trip_duration
             .push((*stop_time - *start_time).to_std().unwrap());
+        self.last_update_time = Some(Instant::now());
     }
 }
 
@@ -128,10 +149,7 @@ impl Handler<UpdateMeta> for RouteFragment {
 
     fn handle(&mut self, msg: UpdateMeta, _ctx: &mut Context<Self>) {
         match msg {
-            UpdateMeta::UpdateStartName(start) => {
-                self.stop_names[0] = start;
-                println!("updated start name to {}", self.stop_names[0])
-            }
+            UpdateMeta::UpdateStartName(start) => self.stop_names[0] = start,
             UpdateMeta::UpdateStopName(stop) => self.stop_names[1] = stop,
         }
     }

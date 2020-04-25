@@ -52,6 +52,7 @@ pub enum PassageStatus {
 }
 
 async fn fetch_tram_passage(s: String) -> reqwest::Result<PassageWelcome> {
+    println!("fetch");
     let fs = format!("https://mpk.jacekk.net/proxy_tram.php/services/tripInfo/tripPassages?tripId={}&mode=departure", s);
     let url = reqwest::Url::parse(&fs).unwrap();
 
