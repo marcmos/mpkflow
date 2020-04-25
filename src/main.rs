@@ -240,34 +240,25 @@ impl Handler<PrintState> for StopState {
     }
 }
 
-const MOGILSKIE_POKOJU: &str = "12529";
-const GRZEGORZECKIE: &str = "36519";
-const CZYZYNSKIE: &str = "40849";
-const STOP_IDS: [&str; 3] = [MOGILSKIE_POKOJU, GRZEGORZECKIE, CZYZYNSKIE];
-
-const MOGILSKA: [&str; 8] = [
+const STOP_IDS: [&str; 38] = [
+    // Mogilskie → Czyżyny
     "12529", "12919", "13019", "304019", "281119", "11319", "11219", "40719",
-];
-const HUTA: [&str; 8] = [
+    // Czyżyny → Mogilskie
     "40829", "40729", "11229", "11329", "281129", "304029", "13029", "12929",
+    // Grzegórzeckie → Huta
+    "36519", "285919", "36719", "36819", "36919", "37019", "303319", "287119", "93019", "304119",
+    "40919", //
+    // Huta → Grzegórzeckie
+    "40849", "40929", "304129", "93029", "287129", "303329", "37029", "36929", "36829", "36729",
+    "285929", //
 ];
 
 async fn handle_frag_stat(
-    req: HttpRequest,
+    _: HttpRequest,
     state: Data<Addr<route_fragment_registry::RouteFragmentRegistry>>,
 ) -> Result<HttpResponse, Error> {
     let mut vec = Vec::new();
-    for stop in MOGILSKA.iter() {
-        let resp = state
-            .send(route_fragment_registry::GetRouteFragment::new(
-                stop.to_string(),
-            ))
-            .and_then(|x| x.send(route_fragment_registry::route_fragment::FragmentStatusRequest))
-            .await
-            .unwrap();
-        vec.push(resp);
-    }
-    for stop in HUTA.iter() {
+    for stop in STOP_IDS.iter() {
         let resp = state
             .send(route_fragment_registry::GetRouteFragment::new(
                 stop.to_string(),
@@ -281,37 +272,22 @@ async fn handle_frag_stat(
     Ok(HttpResponse::Ok().json(vec))
 }
 
-async fn file(req: HttpRequest) -> actix_web::Result<NamedFile> {
+async fn file(_: HttpRequest) -> actix_web::Result<NamedFile> {
     Ok(NamedFile::open("vis.html")?)
 }
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    for x in 0..8 {
+    for x in 0..STOP_IDS.len() - 1 {
         let actor_addr = StopState::create(|_ctx| StopState {
-            stop_id: MOGILSKA[x],
+            stop_id: STOP_IDS[x],
             name: None,
             last_check: std::time::Instant::now(),
             last_reparture_diff: None,
             prev_stop: if x == 0 {
                 None
             } else {
-                Some(String::from(MOGILSKA[x - 1]))
-            },
-        });
-        actor_addr.do_send(UpdateRequest {});
-    }
-
-    for x in 0..8 {
-        let actor_addr = StopState::create(|_ctx| StopState {
-            stop_id: HUTA[x],
-            name: None,
-            last_check: std::time::Instant::now(),
-            last_reparture_diff: None,
-            prev_stop: if x == 0 {
-                None
-            } else {
-                Some(String::from(HUTA[x - 1]))
+                Some(String::from(STOP_IDS[x - 1]))
             },
         });
         actor_addr.do_send(UpdateRequest {});
