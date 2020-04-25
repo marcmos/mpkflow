@@ -11,7 +11,7 @@ pub struct RouteFragment {
     id: String,
     stop_names: [String; 2],
     past_trip_duration: Vec<Duration>,
-    last_update_time: Option<Instant>,
+    last_update_time: Option<NaiveTime>,
     current_trip_starts: HashMap<String, NaiveTime>,
     current_trip_stops: HashMap<String, NaiveTime>,
 }
@@ -59,8 +59,10 @@ pub enum UpdateMeta {
 #[derive(Serialize, MessageResponse, Debug)]
 pub struct RouteFragmentStats {
     pub stop_id: String,
+    pub stop_name: String,
     pub time: Option<u64>,
     pub update_secs: Option<u64>,
+    pub active_trips: Vec<String>,
 }
 
 #[derive(Message, Debug)]
@@ -71,13 +73,18 @@ impl Handler<FragmentStatusRequest> for RouteFragment {
     type Result = RouteFragmentStats;
 
     fn handle(&mut self, _msg: FragmentStatusRequest, _ctx: &mut Context<Self>) -> Self::Result {
-        let last_update = self
-            .last_update_time
-            .map(|x| (Instant::now() - x).as_secs());
+        let last_update = self.last_update_time.map(|x| {
+            (chrono::Local::now().time() - x)
+                .to_std()
+                .unwrap()
+                .as_secs()
+        });
         return RouteFragmentStats {
             stop_id: self.id.clone(),
+            stop_name: self.stop_names[0].clone(),
             time: self.past_trip_duration.last().map(|x| x.as_secs()),
             update_secs: last_update,
+            active_trips: self.current_trip_starts.keys().cloned().collect(),
         };
     }
 }
@@ -87,16 +94,13 @@ impl RouteFragment {
         match (*stop_time - *start_time).to_std() {
             Ok(duration) => {
                 self.past_trip_duration.push(duration);
-                self.last_update_time = Some(Instant::now());
+                self.last_update_time = Some(*stop_time);
             }
             Err(_) => warn!(
                 "Zero or negative trip duration for route fragment {}",
                 self.stop_names[0]
             ),
         }
-        self.past_trip_duration
-            .push((*stop_time - *start_time).to_std().unwrap());
-        self.last_update_time = Some(Instant::now());
     }
 }
 
